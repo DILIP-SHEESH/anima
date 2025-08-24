@@ -1,1 +1,1 @@
-Automated Neuro Insight and Mind Analyser
+# Automated Neuro Insight and Mind Analyser
