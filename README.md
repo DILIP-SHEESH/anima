@@ -1,1 +1,1 @@
-# anima
+# Automated Neuro Insight and Mind Analyser
