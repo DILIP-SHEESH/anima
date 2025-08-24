@@ -1,0 +1,30 @@
+
+# Gradle-specific files
+.gradle/
+/local.properties
+.idea/
+/build/
+/captures/
+.DS_Store
+
+# Android Studio-specific files
+/.idea/caches/
+/.idea/libraries/
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+
+# Compiled and temporary files
+*.iml
+*.apk
+*.aab
+*.aar
+*.dex
+*.keystore
+
+# Build-related directories
+/build/
+/app/build/
+.externalNativeBuild/
+.cxx/
