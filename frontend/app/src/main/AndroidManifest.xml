@@ -2,25 +2,45 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Internet for API calls -->
+    <!-- ==================== Core Permissions ==================== -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Wake lock for background processing -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-
-    <!-- Foreground service for health tracking -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-
-    <!-- Activity recognition (for step counting fallback) -->
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-
-    <!-- Vibration for notifications -->
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- Notification permissions (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Health Connect intents (these are the correct ones for regular apps) -->
+    <!-- ==================== Usage Access Permission (Digital Wellbeing Data) ==================== -->
+    <!-- Allows access to app usage stats, must be manually granted in Settings > Usage Access -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- ==================== Bluetooth / BLE Permissions ==================== -->
+    <!-- Android 12+ (API 31+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- Backward compatibility -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <!-- Required for BLE scanning pre-Android 12 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- ==================== Network / Wi-Fi ==================== -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+    <!-- ==================== USB (Optional Sensor Connection) ==================== -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- ==================== BLE Hardware Requirement ==================== -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <!-- ==================== Health Connect Queries (Optional) ==================== -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
         <intent>
@@ -28,6 +48,7 @@
         </intent>
     </queries>
 
+    <!-- ==================== Application Config ==================== -->
     <application
         android:name=".AnimaApplication"
         android:allowBackup="true"
@@ -37,19 +58,30 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Anima">
+        android:theme="@style/Theme.Anima"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="33">
 
+
+        <!-- ==================== Main Activity ==================== -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Anima">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- ==================== Bluetooth Service ==================== -->
+        <service
+            android:name=".data.bluetooth.BluetoothService"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>

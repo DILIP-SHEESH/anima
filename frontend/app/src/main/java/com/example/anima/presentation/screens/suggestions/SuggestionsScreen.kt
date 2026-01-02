@@ -13,8 +13,14 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.Warning // Added for safety feature
+import androidx.compose.material.icons.filled.PanTool // Added for touch sensor representation
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,12 +29,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
+// Define navigation routes (placeholders for now)
+object SuggestionsRoutes {
+    const val WOMEN_SAFETY = "women_safety_screen"
+    const val CUSTOM_ACTION = "custom_action_screen"
+}
+
 data class SuggestionItem(
     val title: String,
     val description: String,
     val icon: @Composable () -> Unit
 )
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SuggestionsScreen(navController: NavController) {
@@ -60,6 +71,10 @@ fun SuggestionsScreen(navController: NavController) {
         )
     )
 
+    // For demonstration: user's gender or a customizable setting
+    // In a real app, this would come from a ViewModel or user preferences
+    var userGender by remember { mutableStateOf("Female") } // Can be "Male", "Female", "Custom"
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -74,7 +89,51 @@ fun SuggestionsScreen(navController: NavController) {
                     containerColor = MaterialTheme.colorScheme.primary
                 )
             )
-        }
+        },
+        floatingActionButton = {
+            // This FAB simulates the "touch sensor" interaction
+            FloatingActionButton(
+                onClick = {
+                    // Logic to handle touch sensor event
+                    when (userGender) {
+                        "Female" -> {
+                            // Navigate to women's safety screen
+                            navController.navigate(SuggestionsRoutes.WOMEN_SAFETY)
+                            // In a real app, this would also trigger an actual alert/action
+                            println("WOMEN SAFETY ALERT TRIGGERED!")
+                        }
+                        "Male" -> {
+                            // Navigate to a customizable action screen for men
+                            navController.navigate(SuggestionsRoutes.CUSTOM_ACTION)
+                            println("CUSTOM ACTION TRIGGERED FOR MALE USER!")
+                        }
+                        else -> {
+                            // Default or other custom action
+                            navController.navigate(SuggestionsRoutes.CUSTOM_ACTION)
+                            println("DEFAULT/CUSTOM ACTION TRIGGERED!")
+                        }
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.error, // Red for urgency/alert
+                shape = CircleShape,
+                modifier = Modifier.size(64.dp) // Make it prominent
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Filled.PanTool, // Represents a touch/press
+                        contentDescription = "Quick Action Sensor",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = "Press",
+                        color = Color.White,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End // Position the FAB
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
