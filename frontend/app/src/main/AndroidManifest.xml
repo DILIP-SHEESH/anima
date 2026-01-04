@@ -2,45 +2,36 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ==================== Core Permissions ==================== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- ==================== Usage Access Permission (Digital Wellbeing Data) ==================== -->
-    <!-- Allows access to app usage stats, must be manually granted in Settings > Usage Access -->
+    <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- ==================== Bluetooth / BLE Permissions ==================== -->
-    <!-- Android 12+ (API 31+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
-    <!-- Backward compatibility -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 
-    <!-- Required for BLE scanning pre-Android 12 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- ==================== Network / Wi-Fi ==================== -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
-    <!-- ==================== USB (Optional Sensor Connection) ==================== -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
-
-    <!-- ==================== BLE Hardware Requirement ==================== -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
-    <!-- ==================== Health Connect Queries (Optional) ==================== -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
         <intent>
@@ -48,7 +39,6 @@
         </intent>
     </queries>
 
-    <!-- ==================== Application Config ==================== -->
     <application
         android:name=".AnimaApplication"
         android:allowBackup="true"
@@ -63,8 +53,6 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="33">
 
-
-        <!-- ==================== Main Activity ==================== -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -77,11 +65,22 @@
             </intent-filter>
         </activity>
 
-        <!-- ==================== Bluetooth Service ==================== -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".data.bluetooth.BluetoothService"
             android:enabled="true"
             android:exported="false" />
+
     </application>
 
 </manifest>

@@ -1,5 +1,7 @@
 package com.example.anima.presentation.screens.dashboard
 
+
+import androidx.health.connect.client.PermissionController
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStats
@@ -10,6 +12,7 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.anima.data.digitalwellbeing.HealthConnectManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,16 +93,56 @@ fun DashboardScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var hasPermission by remember { mutableStateOf(hasUsagePermission(context)) }
+    // --- State: Usage Stats ---
+    var hasUsagePermission by remember { mutableStateOf(hasUsagePermission(context)) }
     var topApps by remember { mutableStateOf<List<Pair<String, Long>>>(emptyList()) }
     var totalScreenTime by remember { mutableStateOf(0L) }
     var refreshing by remember { mutableStateOf(false) }
 
+    // --- State: Health Connect (NEW) ---
+    val healthManager = remember { HealthConnectManager(context) }
+    var stepsToday by remember { mutableStateOf(0L) }
+    var sleepDuration by remember { mutableStateOf(0L) }
+    var hasHealthPermission by remember { mutableStateOf(false) }
+
+    // --- State: Sensor Data ---
     val httpSensorData by viewModel.httpSensorData.collectAsState()
+
+    // --- Health Connect Permission Launcher ---
+// --- Health Connect Permission Launcher ---
+    // Fix: Use PermissionController.createRequestPermissionResultContract() directly
+    // Fix: Explicitly type 'granted: Set<String>' to solve inference errors
+    val healthPermissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { granted: Set<String> ->
+        if (granted.containsAll(healthManager.permissions)) {
+            hasHealthPermission = true
+            // Permission granted, fetch data immediately
+            coroutineScope.launch {
+                stepsToday = healthManager.getStepsToday()
+                sleepDuration = healthManager.getSleepDurationMinutes()
+            }
+        }
+    }
 
     // Initial load
     LaunchedEffect(Unit) {
-        hasPermission = hasUsagePermission(context)
+        // 1. Check Usage Stats
+        hasUsagePermission = hasUsagePermission(context)
+        if (hasUsagePermission) {
+            val stats = withContext(Dispatchers.IO) { getAppUsageStats(context) }
+            topApps = getTopUsedApps(stats)
+            totalScreenTime = getRealScreenTime(context)
+        }
+
+        // 2. Check Health Connect
+        hasHealthPermission = healthManager.hasPermissions()
+        if (hasHealthPermission) {
+            stepsToday = healthManager.getStepsToday()
+            sleepDuration = healthManager.getSleepDurationMinutes()
+        }
+
+        // 3. Fetch Server Data
         viewModel.fetchHttpSensorData()
     }
 
@@ -106,11 +150,20 @@ fun DashboardScreen(
         refreshing = true
         coroutineScope.launch {
             try {
-                if (hasPermission) {
+                // Refresh Usage Stats
+                if (hasUsagePermission) {
                     val stats = withContext(Dispatchers.IO) { getAppUsageStats(context) }
                     topApps = getTopUsedApps(stats)
                     totalScreenTime = getRealScreenTime(context)
                 }
+
+                // Refresh Health Data
+                if (hasHealthPermission) {
+                    stepsToday = healthManager.getStepsToday()
+                    sleepDuration = healthManager.getSleepDurationMinutes()
+                }
+
+                // Refresh Server Data
                 viewModel.fetchHttpSensorData()
             } catch (e: Exception) {
                 Log.e("DashboardScreen", "Refresh failed", e)
@@ -126,64 +179,117 @@ fun DashboardScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Digital Wellbeing Dashboard",
+            text = "Anima Dashboard",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (!hasPermission) {
-            Text(
-                text = "To see your screen time and app usage, please grant Usage Access permission.",
-                style = MaterialTheme.typography.bodyMedium
+        // REFRESH BUTTON
+        Button(
+            onClick = { refreshData() },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !refreshing
+        ) {
+            Text(if (refreshing) "Refreshing..." else "Refresh Data")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ==================== SECTION 1: PHYSICAL WELLBEING (HEALTH CONNECT) ====================
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { openUsageAccessSettings(context) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Grant Usage Access")
-            }
-        } else {
-            Button(
-                onClick = { refreshData() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !refreshing
-            ) {
-                Text(if (refreshing) "Refreshing..." else "Refresh Now")
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (topApps.isEmpty()) {
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = if (refreshing) "Loading app usage data..." else "No app usage data available today.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                Text(
-                    text = "Top 5 Most Used Apps",
-                    style = MaterialTheme.typography.titleMedium
+                    text = "Physical Wellbeing (Google Fit)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+
+                if (hasHealthPermission) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Steps Today", style = MaterialTheme.typography.labelMedium)
+                            Text("$stepsToday", style = MaterialTheme.typography.headlineMedium)
+                        }
+                        Column {
+                            Text("Sleep", style = MaterialTheme.typography.labelMedium)
+                            Text("${sleepDuration / 60}h ${sleepDuration % 60}m", style = MaterialTheme.typography.headlineMedium)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Connect to see Steps & Sleep data.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { healthPermissionLauncher.launch(healthManager.permissions) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Connect Health Data")
+                    }
+                }
+            }
+        }
+
+        // ==================== SECTION 2: DIGITAL WELLBEING (USAGE STATS) ====================
+        if (!hasUsagePermission) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Digital Wellbeing Permission Needed", fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = { openUsageAccessSettings(context) },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        Text("Grant Usage Access")
+                    }
+                }
+            }
+        } else {
+            Text(
+                text = "Top Used Apps (Screen Time: ${formatTime(totalScreenTime)})",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                if (topApps.isEmpty()) {
+                    item { Text("No usage data yet today.") }
+                } else {
                     items(topApps) { (packageName, time) ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = 4.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 Text(
                                     text = getAppName(context, packageName),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    text = "Used for ${formatTime(time)}",
+                                    text = formatTime(time),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -191,77 +297,43 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- HTTP Sensor Card (Existing) ----
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Sensor Data from Server",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = httpSensorData,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+        // ==================== SECTION 3: SENSOR DATA & THRESHOLDS ====================
+        // Scrollable container for the rest so it doesn't get cut off on small screens
+        LazyColumn(modifier = Modifier.weight(1f)) {
+
+            // HTTP Data
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Live Sensor Data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(text = httpSensorData, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ---- Physiological Anomaly Thresholds Card (NEW STUFF) ----
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Physiological Anomaly Thresholds (Reference)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
-                        items(physiologicalThresholds) { threshold ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = threshold.name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Normal: ${threshold.normalRange}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Text(
-                                    text = "Anomaly: ${threshold.anomalyThreshold}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    text = "Note: ${threshold.interpretation}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                                Divider(modifier = Modifier.padding(top = 8.dp))
-                            }
+            // Thresholds
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Physiological Thresholds", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        physiologicalThresholds.forEach { threshold ->
+                            Text(
+                                text = "${threshold.name}: ${threshold.anomalyThreshold}",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                         }
                     }
                 }
@@ -269,6 +341,7 @@ fun DashboardScreen(
         }
     }
 }
+
 
 /* -------------------- Helper Functions -------------------- */
 // (All existing helper functions remain unchanged)

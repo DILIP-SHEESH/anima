@@ -1,273 +1,384 @@
 package com.example.anima.presentation.screens.profile
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.anima.R // Assuming R contains drawable resources
+
+// --- Color Palette for Clinical Data (Based on Medical UI standards) ---
+val ClinicalRed = Color(0xFFE57373)   // High Stress / Alert
+val ClinicalGreen = Color(0xFF81C784) // Normal / Recovery
+val ClinicalBlue = Color(0xFF64B5F6)  // Sleep / Calm
+val ClinicalAmber = Color(0xFFFFD54F) // Attention Needed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavController) {
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = {
-                    Text(
-                        "User Profile",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Column {
+                        Text(
+                            "Medical Profile",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Patient ID: #ANIMA-8821",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                actions = {
+                    IconButton(onClick = { /* Export PDF Logic */ }) {
+                        Icon(Icons.Outlined.FileDownload, contentDescription = "Export Report")
+                    }
+                }
             )
         }
     ) { paddingValues ->
-        Column(
+        // Changed to LazyColumn so the whole screen scrolls (crucial for phones)
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // 1. Patient Header Card
+            item {
+                PatientHeader()
+            }
 
-            // Avatar Placeholder (Formal Look)
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                // Placeholder Icon for a professional touch
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = "User Avatar",
-                    modifier = Modifier.size(56.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+            // 2. The "Doctor's View": Key Biomarkers Grid
+            item {
+                Text(
+                    "Real-time Biomarkers (Avg 24h)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                BiomarkerGrid()
+            }
+
+            // 3. Clinical Trend Analysis (Custom Graph)
+            item {
+                ClinicalTrendCard(
+                    title = "Stress Response Trend (HRV)",
+                    subtitle = "Low HRV indicates high sympathetic nervous system activity (Stress)",
+                    dataPoints = listOf(65f, 62f, 58f, 45f, 42f, 50f, 70f, 72f), // Mock HRV Data
+                    chartColor = ClinicalRed
                 )
             }
+
+            // 4. Sleep & Recovery (Essential for Mental Health)
+            item {
+                ClinicalTrendCard(
+                    title = "Sleep & Recovery Score",
+                    subtitle = "Correlated with skin temperature drop",
+                    dataPoints = listOf(80f, 85f, 60f, 55f, 90f, 88f, 82f),
+                    chartColor = ClinicalBlue
+                )
+            }
+
+            // 5. Patient Actions
+            item {
+                Text(
+                    "Patient Management",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                ManagementOption(
+                    icon = Icons.Outlined.History,
+                    title = "View Full Medical History",
+                    description = "Access logs from past 6 months"
+                )
+                ManagementOption(
+                    icon = Icons.Default.Settings,
+                    title = "Sensor Calibration",
+                    description = "Recalibrate EDA and PPG thresholds"
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// UI COMPONENTS
+// -----------------------------------------------------------------------------
+
+@Composable
+fun PatientHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "JS",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column {
+            Text(
+                text = "John Snow",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Age: 29 | Blood: O+",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AssistChip(
+                onClick = { },
+                label = { Text("Monitoring Active") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.MonitorHeart,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = ClinicalGreen
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = ClinicalGreen.copy(alpha = 0.1f),
+                    labelColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun BiomarkerGrid() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            BiomarkerCard(
+                modifier = Modifier.weight(1f),
+                title = "Heart Rate",
+                value = "72",
+                unit = "BPM",
+                status = "Normal",
+                color = ClinicalGreen
+            )
+            BiomarkerCard(
+                modifier = Modifier.weight(1f),
+                title = "HRV (Stress)",
+                value = "42",
+                unit = "ms",
+                status = "Low Warning",
+                color = ClinicalAmber
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            BiomarkerCard(
+                modifier = Modifier.weight(1f),
+                title = "EDA (Sweat)",
+                value = "1.2",
+                unit = "µS",
+                status = "Elevated",
+                color = ClinicalRed // Red because EDA spikes mean acute stress
+            )
+            BiomarkerCard(
+                modifier = Modifier.weight(1f),
+                title = "Skin Temp",
+                value = "36.4",
+                unit = "°C",
+                status = "Normal",
+                color = ClinicalBlue
+            )
+        }
+    }
+}
+
+@Composable
+fun BiomarkerCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    unit: String,
+    status: String,
+    color: Color
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.Circle, contentDescription = null, tint = color, modifier = Modifier.size(8.dp))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(unit, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 4.dp))
+            }
+            Text(
+                status,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+fun ClinicalTrendCard(
+    title: String,
+    subtitle: String,
+    dataPoints: List<Float>,
+    chartColor: Color
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // User Info
-            Text(
-                text = "John snow",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold)
-            )
-            Text(
-                text = "umar@email.com",
-                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Mental Health Stats Card (Wellness Metrics)
-            Card(
-                shape = RoundedCornerShape(16.dp),
+            // CUSTOM DRAWING: A Real Graph instead of a placeholder
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-                )
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .padding(8.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Physiological Baseline Metrics",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Divider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Stat Item 1: Directly related to the monitoring goal
-                        StatItem("Baseline HR", "65 BPM")
-
-                        // Stat Item 2: Summary of anomaly detection
-                        StatItem("Stress Index", "Low (1.2/5)")
-
-                        // Stat Item 3: Contextual metric
-                        StatItem("Sleep Avg", "6h 45m")
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    // Graph for a quick overview, e.g., daily stress index trend
-                    Text(
-                        text = "Recent Stress Index Trend",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    GraphPlaceholder(Modifier.fillMaxWidth().height(100.dp), MaterialTheme.colorScheme.primary)
-                }
+                LineChart(dataPoints = dataPoints, lineColor = chartColor)
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Historical Data Graphs Card (NEW ADDITION)
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Historical Data & Trends",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-
-                    Text(
-                        text = "Heart Rate Variability (HRV) Over Time",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    GraphPlaceholder(Modifier.fillMaxWidth().height(120.dp), MaterialTheme.colorScheme.tertiary)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "Skin Conductance (EDA) Daily Peaks",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    GraphPlaceholder(Modifier.fillMaxWidth().height(120.dp), MaterialTheme.colorScheme.error)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Actions
-            ProfileOption(
-                icon = Icons.Filled.Edit,
-                title = "Manage Account Details",
-                description = "Update personal information and contact settings",
-                onClick = { /* TODO: Open Edit Profile Screen */ }
-            )
-            ProfileOption(
-                icon = Icons.Filled.Settings,
-                title = "Application Configuration",
-                description = "Adjust sensor calibration and notification settings",
-                onClick = { /* TODO: Navigate to Settings Screen */ }
-            )
-            ProfileOption(
-                icon = Icons.Filled.Logout,
-                title = "End Session & Logout",
-                description = "Securely log out of the monitoring system",
-                onClick = { /* TODO: Implement Logout */ }
-            )
         }
     }
 }
 
 @Composable
-fun StatItem(title: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-            fontSize = 14.sp
+fun LineChart(dataPoints: List<Float>, lineColor: Color) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        if (dataPoints.isEmpty()) return@Canvas
+
+        // Normalize data to fit height
+        val maxData = dataPoints.maxOrNull() ?: 100f
+        val minData = dataPoints.minOrNull() ?: 0f
+        val range = maxData - minData
+
+        val widthPerPoint = size.width / (dataPoints.size - 1)
+        val height = size.height
+
+        val path = Path()
+
+        dataPoints.forEachIndexed { index, data ->
+            val x = index * widthPerPoint
+            // Flip Y axis (0 is top in Canvas)
+            val normalizedY = (data - minData) / range
+            val y = height - (normalizedY * height)
+
+            if (index == 0) {
+                path.moveTo(x, y)
+            } else {
+                // Smooth curve (Cubic Bezier) logic can go here, using straight lines for simplicity
+                path.lineTo(x, y)
+            }
+        }
+
+        // Draw the line
+        drawPath(
+            path = path,
+            color = lineColor,
+            style = Stroke(width = 3.dp.toPx())
         )
-        Text(
-            text = value,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
+
+        // Draw Fill Gradient
+        val fillPath = Path().apply {
+            addPath(path)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+
+        drawPath(
+            path = fillPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(lineColor.copy(alpha = 0.3f), Color.Transparent)
+            )
         )
     }
 }
 
 @Composable
-fun ProfileOption(icon: ImageVector, title: String, description: String, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+fun ManagementOption(icon: ImageVector, title: String, description: String) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
             modifier = Modifier
-                .padding(16.dp)
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                icon,
-                contentDescription = title,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
-    }
-}
-
-@Composable
-fun GraphPlaceholder(modifier: Modifier = Modifier, graphColor: Color = Color.Gray) {
-    Box(
-        modifier = modifier
-            .background(
-                color = graphColor.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // This is a simple visual placeholder. In a real app,
-        // you would integrate a charting library here (e.g., MPAndroidChart, Compose-Charts).
-        Text(
-            text = "Graph Placeholder",
-            color = graphColor.copy(alpha = 0.6f),
-            style = MaterialTheme.typography.bodySmall
-        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

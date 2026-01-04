@@ -15,18 +15,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.nio.charset.Charset
 import java.util.*
-
-/**
- * BluetoothManager
- * - Scans for device advertising SERVICE_UUID or matching name
- * - Connects and enables notifications on CHAR_UUID
- * - Emits SensorData via sensorFlow and raw strings via rawFlow
- *
- * Note: Caller must ensure runtime permissions are granted before calling startScan().
- */
 class BluetoothManager(
     private val context: Context,
-    private val parser: BluetoothParser, // 👈 CORRECTED CONSTRUCTOR
+    private val parser: BluetoothParser,
     private val deviceNameFilter: String = "AnimaSmartGlasses"
 ) {
     companion object {
