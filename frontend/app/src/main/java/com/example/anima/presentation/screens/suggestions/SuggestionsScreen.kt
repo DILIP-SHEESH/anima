@@ -1,8 +1,8 @@
 package com.example.anima.presentation.screens.suggestions
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,40 +12,45 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
+import kotlinx.coroutines.delay
 
-// --- Gamification Colors ---
-val QuestGold = Color(0xFFFFD700)
-val QuestPurple = Color(0xFF7E57C2)
-val SafetyRed = Color(0xFFE53935)
-val SuccessGreen = Color(0xFF43A047)
+// --- Clean Clinical Colors ---
+val ClinicalBackground = Color(0xFFF5F6F8) // Soft Gray/White
+val PrimaryBlue = Color(0xFF1976D2)        // Trustworthy Blue
+val SuccessGreen = Color(0xFF43A047)       // Medical Green
+val AlertRed = Color(0xFFE53935)           // Emergency Red
 
-// --- Data Model for Quests ---
+// --- Data Models ---
 data class DailyQuest(
     val id: Int,
     val title: String,
     val description: String,
     val xpReward: Int,
+    val durationSeconds: Int, // Actual duration in seconds
     val type: QuestType,
     var isCompleted: Boolean = false
 )
 
 enum class QuestType {
-    STRESS_REDUCTION, PHYSICAL, SLEEP, COGNITIVE
+    BREATHING, PHYSICAL, SLEEP, COGNITIVE
 }
 
-// Navigation Placeholders
 object SuggestionsRoutes {
     const val WOMEN_SAFETY = "women_safety_screen"
     const val CUSTOM_ACTION = "custom_action_screen"
@@ -54,103 +59,107 @@ object SuggestionsRoutes {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SuggestionsScreen(navController: NavController) {
-    // Mock Data: In a real app, this comes from your Stress Classification Model
-    // If Stress > Threshold, add "Breathing" quest.
+    // Real Quest Data with Durations
     val initialQuests = listOf(
-        DailyQuest(1, "Cortisol Reset", "Perform 3 mins of box breathing to lower heart rate.", 50, QuestType.STRESS_REDUCTION),
-        DailyQuest(2, "Movement Break", "Walk 500 steps to clear metabolic waste.", 30, QuestType.PHYSICAL),
-        DailyQuest(3, "Digital Sunset", "Avoid blue light for 20 mins.", 40, QuestType.SLEEP),
-        DailyQuest(4, "Gratitude Log", "Log one positive interaction today.", 20, QuestType.COGNITIVE)
+        DailyQuest(1, "Cortisol Reset", "Box breathing to lower heart rate.", 50, 180, QuestType.BREATHING), // 3 Mins
+        DailyQuest(2, "Metabolic Walk", "Walk 500 steps to clear waste.", 30, 300, QuestType.PHYSICAL),
+        DailyQuest(3, "Cognitive Drill", "Learn one new fact or skill.", 40, 120, QuestType.COGNITIVE),
+        DailyQuest(4, "Sleep Hygiene", "No blue light for 20 mins.", 20, 1200, QuestType.SLEEP)
     )
 
     var quests by remember { mutableStateOf(initialQuests) }
-    var userXP by remember { mutableStateOf(1250) } // Current total XP
-    var dailyProgress by remember { mutableStateOf(0.3f) } // 30% done today
+    var showTimerDialog by remember { mutableStateOf(false) }
+    var activeQuest by remember { mutableStateOf<DailyQuest?>(null) }
 
-    // Logic for Touch Sensor (Hardware integration simulation)
-    var userGender by remember { mutableStateOf("Female") } // Configurable setting
+    val haptic = LocalHapticFeedback.current
 
     Scaffold(
+        containerColor = ClinicalBackground,
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text("Wellness Quests", fontWeight = FontWeight.Bold)
-                        Text("Day 12 Streak 🔥", style = MaterialTheme.typography.labelSmall, color = QuestGold)
-                    }
-                },
-                actions = {
-                    // Level Indicator
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .background(QuestPurple.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("Lvl 5 • ${userXP} XP", color = QuestPurple, fontWeight = FontWeight.Bold)
-                    }
-                }
+                title = { Text("Daily Interventions", fontWeight = FontWeight.SemiBold) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = ClinicalBackground)
             )
         },
         floatingActionButton = {
-            // THE "HARDWARE" TOUCH SENSOR BUTTON
-            // Designed to look like a physical emergency button
-            EmergencySensorFab(
-                gender = userGender,
+            // Hardware Sensor Action Button
+            FloatingActionButton(
                 onClick = {
-                    when (userGender) {
-                        "Female" -> {
-                            // Trigger SOS logic
-                            navController.navigate(SuggestionsRoutes.WOMEN_SAFETY)
-                        }
-                        else -> {
-                            // Trigger Custom Action
-                            navController.navigate(SuggestionsRoutes.CUSTOM_ACTION)
-                        }
-                    }
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    // Hardware Trigger Logic
+                    navController.navigate(SuggestionsRoutes.WOMEN_SAFETY)
+                },
+                containerColor = AlertRed,
+                contentColor = Color.White
+            ) {
+                Row(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Icon(Icons.Default.TouchApp, null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("SENSOR ACTION", fontWeight = FontWeight.Bold)
                 }
-            )
+            }
         }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp)
         ) {
-            // 1. Progress Header (The "Game" Status)
-            GamificationHeader(progress = dailyProgress, completedTasks = quests.count { it.isCompleted }, totalTasks = quests.size)
+            // 1. Progress Overview
+            val completedCount = quests.count { it.isCompleted }
+            val progress = completedCount / quests.size.toFloat()
 
-            Spacer(modifier = Modifier.height(16.dp))
+            ProgressCard(progress, completedCount, quests.size)
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                "Today's Interventions",
+                "Today's Tasks",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                color = Color.Black.copy(alpha = 0.7f)
             )
 
-            // 2. The Quest List
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 2. Task List
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 items(quests) { quest ->
                     QuestCard(
                         quest = quest,
-                        onClaim = {
-                            // Mark as complete and add XP
-                            val updatedList = quests.map {
-                                if (it.id == quest.id) it.copy(isCompleted = true) else it
+                        onStart = {
+                            if (quest.type == QuestType.BREATHING) {
+                                // Open Real Timer for Breathing
+                                activeQuest = quest
+                                showTimerDialog = true
+                            } else {
+                                // Instant Complete for others (or add navigation)
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                quests = quests.map { if (it.id == quest.id) it.copy(isCompleted = true) else it }
                             }
-                            quests = updatedList
-                            userXP += quest.xpReward
-                            dailyProgress = updatedList.count { it.isCompleted } / updatedList.size.toFloat()
                         }
                     )
                 }
             }
         }
+    }
+
+    // --- REAL FEATURE: BREATHING TIMER DIALOG ---
+    if (showTimerDialog && activeQuest != null) {
+        BreathingTimerDialog(
+            quest = activeQuest!!,
+            onDismiss = { showTimerDialog = false },
+            onComplete = {
+                // Mark quest as done when timer finishes
+                quests = quests.map { if (it.id == activeQuest!!.id) it.copy(isCompleted = true) else it }
+                showTimerDialog = false
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        )
     }
 }
 
@@ -159,30 +168,31 @@ fun SuggestionsScreen(navController: NavController) {
 // -----------------------------------------------------------------------------
 
 @Composable
-fun GamificationHeader(progress: Float, completedTasks: Int, totalTasks: Int) {
-    val animatedProgress by animateFloatAsState(targetValue = progress, label = "Progress")
+fun ProgressCard(progress: Float, completed: Int, total: Int) {
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        shape = RoundedCornerShape(24.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier
-                .padding(20.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Circular Progress Indicator
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
+                    progress = { 1f },
+                    modifier = Modifier.size(60.dp),
+                    color = Color.LightGray.copy(alpha = 0.3f),
+                    strokeWidth = 6.dp
+                )
+                CircularProgressIndicator(
                     progress = { animatedProgress },
-                    modifier = Modifier.size(70.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
-                    strokeWidth = 6.dp,
+                    modifier = Modifier.size(60.dp),
+                    color = if (progress == 1f) SuccessGreen else PrimaryBlue,
+                    strokeWidth = 6.dp
                 )
                 Text(
                     text = "${(progress * 100).toInt()}%",
@@ -190,44 +200,29 @@ fun GamificationHeader(progress: Float, completedTasks: Int, totalTasks: Int) {
                     fontWeight = FontWeight.Bold
                 )
             }
-
             Spacer(modifier = Modifier.width(20.dp))
-
             Column {
                 Text(
-                    text = "Daily Vitality Goal",
+                    text = "Daily Compliance",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "$completedTasks / $totalTasks Interventions Completed",
+                    text = "$completed / $total Interventions Done",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    color = Color.Gray
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                if (progress >= 1.0f) {
-                    Text("🎉 Goal Reached! High Recovery.", color = SuccessGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                } else {
-                    Text("Complete tasks to optimize HRV.", style = MaterialTheme.typography.labelSmall)
-                }
             }
         }
     }
 }
 
 @Composable
-fun QuestCard(quest: DailyQuest, onClaim: () -> Unit) {
-    val cardColor = if (quest.isCompleted)
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-    else
-        MaterialTheme.colorScheme.surfaceVariant
-
-    val textColor = if (quest.isCompleted) Color.Gray else MaterialTheme.colorScheme.onSurface
-
+fun QuestCard(quest: DailyQuest, onStart: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(if (quest.isCompleted) 0.dp else 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(if (quest.isCompleted) 0.dp else 2.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -236,118 +231,130 @@ fun QuestCard(quest: DailyQuest, onClaim: () -> Unit) {
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon Box
+            // Icon
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(getQuestColor(quest.type).copy(alpha = 0.2f)),
+                    .clip(CircleShape)
+                    .background(if (quest.isCompleted) Color.LightGray.copy(alpha = 0.2f) else PrimaryBlue.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = getQuestIcon(quest.type),
                     contentDescription = null,
-                    tint = getQuestColor(quest.type)
+                    tint = if (quest.isCompleted) Color.Gray else PrimaryBlue
                 )
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
+            // Text
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = quest.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = textColor,
-                    style = androidx.compose.ui.text.TextStyle(textDecoration = if(quest.isCompleted) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (quest.isCompleted) Color.Gray else Color.Black
                 )
                 Text(
-                    text = quest.description,
+                    text = "${quest.durationSeconds / 60} min • ${quest.description}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = textColor.copy(alpha = 0.7f),
-                    maxLines = 2
+                    color = Color.Gray,
+                    maxLines = 1
                 )
-                if (!quest.isCompleted) {
-                    Text(
-                        text = "+${quest.xpReward} XP",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = QuestGold,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
             }
 
+            // Action Button
             if (quest.isCompleted) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = "Done", tint = SuccessGreen)
+                Icon(Icons.Rounded.CheckCircle, null, tint = SuccessGreen)
             } else {
                 Button(
-                    onClick = onClaim,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                    modifier = Modifier.height(32.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    onClick = onStart,
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                    modifier = Modifier.height(36.dp)
                 ) {
-                    Text("Start", fontSize = 12.sp)
+                    Text("Start")
                 }
             }
         }
     }
 }
 
+// --- THE REAL BREATHING TIMER LOGIC ---
 @Composable
-fun EmergencySensorFab(gender: String, onClick: () -> Unit) {
-    // This visually represents the Touch Sensor on the glasses
-    val colorStops = arrayOf(
-        0.0f to SafetyRed,
-        1.0f to Color(0xFFB71C1C)
-    )
+fun BreathingTimerDialog(quest: DailyQuest, onDismiss: () -> Unit, onComplete: () -> Unit) {
+    // Timer State
+    var timeLeft by remember { mutableStateOf(quest.durationSeconds) }
+    var isRunning by remember { mutableStateOf(true) }
 
-    FloatingActionButton(
-        onClick = onClick,
-        containerColor = Color.Transparent, // Using Box for gradient
-        elevation = FloatingActionButtonDefaults.elevation(8.dp),
-        modifier = Modifier.size(72.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.radialGradient(colorStops = colorStops))
-                .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
-            contentAlignment = Alignment.Center
+    // Countdown Logic
+    LaunchedEffect(isRunning) {
+        while (isRunning && timeLeft > 0) {
+            delay(1000L)
+            timeLeft--
+        }
+        if (timeLeft == 0) {
+            onComplete() // Auto-finish when time hits 0
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Filled.TouchApp,
-                    contentDescription = "Touch Sensor",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(quest.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Focus on your breathing...", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Big Timer Text
+                val minutes = timeLeft / 60
+                val seconds = timeLeft % 60
                 Text(
-                    if (gender == "Female") "SOS" else "Action",
-                    color = Color.White,
+                    text = String.format("%02d:%02d", minutes, seconds),
+                    fontSize = 64.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp
+                    color = PrimaryBlue,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Controls
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedButton(onClick = { isRunning = !isRunning }) {
+                        Text(if (isRunning) "Pause" else "Resume")
+                    }
+                    Button(
+                        onClick = onDismiss, // Cancel
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                    ) {
+                        Text("Stop")
+                    }
+                }
+
+                // Cheat Button for Demo (Finish Instantly)
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onComplete) {
+                    Text("Skip (Demo Only)", fontSize = 12.sp, color = Color.Gray)
+                }
             }
         }
     }
 }
 
 // Helpers
-fun getQuestColor(type: QuestType): Color {
-    return when (type) {
-        QuestType.STRESS_REDUCTION -> Color(0xFF42A5F5) // Blue
-        QuestType.PHYSICAL -> Color(0xFF66BB6A)       // Green
-        QuestType.SLEEP -> Color(0xFFAB47BC)          // Purple
-        QuestType.COGNITIVE -> Color(0xFFFFA726)      // Orange
-    }
-}
-
 fun getQuestIcon(type: QuestType): ImageVector {
     return when (type) {
-        QuestType.STRESS_REDUCTION -> Icons.Filled.SelfImprovement
-        QuestType.PHYSICAL -> Icons.Filled.DirectionsWalk
-        QuestType.SLEEP -> Icons.Filled.Bedtime
-        QuestType.COGNITIVE -> Icons.Filled.Psychology
+        QuestType.BREATHING -> Icons.Default.SelfImprovement
+        QuestType.PHYSICAL -> Icons.Default.DirectionsWalk
+        QuestType.SLEEP -> Icons.Default.Bedtime
+        QuestType.COGNITIVE -> Icons.Default.Psychology
     }
 }
